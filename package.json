@@ -1,0 +1,30 @@
+{
+  "name": "openbci",
+  "version": "0.2.0",
+  "description": "Metamechanics EEG headset driver",
+  "keywords": [
+    "neurofeedback",
+    "NeuroServer",
+    "EEG"
+  ],
+  "author": "kenneth <kenny@unhosted.org> (http://kennyb.github.com)",
+  "homepage": "http://kennyb.github.com/eegdriver-node/",
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/kennyb/eegdriver-node/raw/master/LICENSE"
+    }
+  ],
+  "engines": {
+    "node": ">= 0.6.7"
+  },
+  "directories": {
+    "lib": "./lib"
+  },
+  "main": "./lib/index.js",
+  "engine": "node",
+  "repositories": {
+    "type": "git",
+    "url": "git://github.com/kennyb/eegdriver-node.git"
+  }
+}

@@ -1,0 +1,7 @@
+#process.env['NODE_PATH'] += ':' + __dirname + "/../lib";
+eeg = require '../lib'
+
+edf = new eeg.EDFReader 'test/2011-madrid-kenny-01.edf'
+
+edf.on 'data', (data) ->
+	console.log 'data:', data
