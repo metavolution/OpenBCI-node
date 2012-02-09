@@ -5,3 +5,15 @@ edf = new eeg.EDFReader 'test/2011-madrid-kenny-01.edf'
 
 edf.on 'data', (data) ->
 	console.log 'data:', data
+
+edf.start!
+setTimeout ->
+	edf.stop!
+	
+	edf.seek 5000
+
+	edf.start!
+	setTimeout ->
+		edf.stop!
+	, 1000
+, 500

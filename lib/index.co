@@ -2,6 +2,11 @@ Fs = require 'fs'
 Events = require 'events'
 eegdriver = {} #require './eegdriver.node'
 
+#TODO: finish up the EEGDriver
+#TODO: function to return the header
+#TODO: functions to start/stop
+#TODO: functions to seek on percent and on milliseconds
+
 class EEGDriver extends Events.EventEmitter
 	(device, opts = {}) ->
 		console.log "creating EEGDriver with:", device
@@ -24,66 +29,77 @@ class EEGDriver extends Events.EventEmitter
 class EDFReader extends Events.EventEmitter
 	(device, opts = {}) ->
 		console.log "-> EDFReader"
-		Fs.readFile device, (err, data) ~>
-			@buf = data
-			@i = 0
-			@recordNum = 0
-			@sampleNum = 0
-			
-			@header = {
-				dataFormat: @Str 8
-				localPatient: @Str 80
-				localRecorder: @Str 80
-				recordingStartDate: @Str 8
-				recordingStartTime: @Str 8
-				headerRecordBytes: 1*@Str 8
-				manufacturerID: @Str 44
-				dataRecordCount: 1*@Str 8
-				dataRecordSeconds: 1*@Str 8
-				dataRecordChannels: 1*@Str 4
-				chan: []
-			}
-			
-			@header.headerRecordBytes = 256 * (@header.dataRecordChannels+1)
-			ch = {
-				label: 16
-				transducer: 80
-				dimUnit: 8
-				physMin: 8
-				physMax: 8
-				digiMin: 8
-				digiMax: 8
-				prefiltering: 80
-				sampleCount: 8
-				reserved: 32
-			}
-			
-			for k, v in ch
-				for i from 0 til @header.dataRecordChannels
-					if typeof @header.chan[i] is not \object then @header.chan[i] = {}
-					vv = @Str v
-					@header.chan[i][k] = if isFinite vv then 1*vv else vv
-			
-			@sampleCount = @header.chan[0].sampleCount
-			@dataRecordChunkSize = @sampleCount*@header.dataRecordChannels*2
-			@dataRecordCount = Math.floor (@buf.length-@header.headerRecordBytes) / @dataRecordChunkSize
-			@start!
-			
+		@h = {}
+		@i = 0
+		@recordNum = 0
+		@sampleNum = 0
+
+		data = Fs.readFileSync device
+		@buf = data
+		@h <<<< {
+			dataFormat: @Str 8
+			localPatient: @Str 80
+			localRecorder: @Str 80
+			recordingStartDate: @Str 8
+			recordingStartTime: @Str 8
+			headerRecordBytes: 1*@Str 8
+			manufacturerID: @Str 44
+			dataRecordCount: 1*@Str 8
+			dataRecordSeconds: 1*@Str 8
+			dataRecordChannels: 1*@Str 4
+			chan: []
+		}
+		
+		@h.headerRecordBytes = 256 * (@h.dataRecordChannels+1)
+		ch = {
+			label: 16
+			transducer: 80
+			dimUnit: 8
+			physMin: 8
+			physMax: 8
+			digiMin: 8
+			digiMax: 8
+			prefiltering: 80
+			sampleCount: 8
+			reserved: 32
+		}
+		
+		for k, v in ch
+			for i from 0 til @h.dataRecordChannels
+				if typeof @h.chan[i] is not \object then @h.chan[i] = {}
+				vv = @Str v
+				@h.chan[i][k] = if isFinite vv then 1*vv else vv
+		
+		@sampleCount = @h.chan[0].sampleCount
+		@dataRecordChunkSize = @sampleCount*@h.dataRecordChannels*2
+		@h.dataRecordCount = @dataRecordCount = Math.floor (@buf.length-@h.headerRecordBytes) / @dataRecordChunkSize
+		
 	start: ->
 		# PROBLEM: we assume all channels have the same samples/sec. it's likely, but not assumed
-		@interval = @header.dataRecordSeconds * @header.chan[0].sampleCount / 1000
+		@interval = @h.dataRecordSeconds * @h.chan[0].sampleCount / 1000
 		@state = 'playing'
-		@startTime = new Date!.getTime!
+		@startTime = new Date!.getTime! - (@recordNum / @h.dataRecordSeconds * 1000) - (@sampleNum / @sampleCount * 1000)
 		@updateLoop!
-		console.log "set interval for #{@header.dataRecordSeconds * @header.chan[0].sampleCount / 1000}"
 		
 	stop: ->
 		@state = 'paused'
+		
+	seek: (ms) ->
+		if ms <= 1 and ms >= 0
+			sec = ms * @dataRecordCount * @h.dataRecordSeconds
+		else
+			sec = ms / 1000
+		
+		@sampleNum = Math.floor sec % @h.dataRecordSeconds / @sampleCount
+		@recordNum = Math.floor sec / @h.dataRecordSeconds
+			
+	header: ->
+		return @h
 			
 	updateLoop: ->
-		sample = new Array @header.dataRecordChannels
-		offset = @header.headerRecordBytes + (@recordNum*@dataRecordChunkSize)
-		for i from 0 til @header.dataRecordChannels
+		sample = new Array @h.dataRecordChannels
+		offset = @h.headerRecordBytes + (@recordNum*@dataRecordChunkSize)
+		for i from 0 til @h.dataRecordChannels
 			# PROBLEM: this isn't safe if the platform is big endian
 			sample[i] = @buf.readInt16LE offset+2*(@sampleNum+i*@sampleCount), true
 		
@@ -93,7 +109,7 @@ class EDFReader extends Events.EventEmitter
 			@recordNum++
 			
 		if @recordNum <= @dataRecordCount and @state is \playing
-			diff = @startTime + (@recordNum / @header.dataRecordSeconds * 1000) + (@sampleNum / @sampleCount * 1000) - new Date!.getTime!
+			diff = @startTime + (@recordNum / @h.dataRecordSeconds * 1000) + (@sampleNum / @sampleCount * 1000) - new Date!.getTime!
 			setTimeout ~>
 				@updateLoop!
 			, 0 >? diff
